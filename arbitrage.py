@@ -6,12 +6,17 @@ def get_coin_tickers(endpoint):
     req = requests.get(endpoint)
     return req.json()
 
+def reverse_pair(pair):
+    quote, base = pair.split("_")
+    return f"{base}_{quote}"
+
 def get_tradable_coins(data_json):
     tradable_coins = []
     for coin in data_json:
         frozen = int(data_json[coin]["isFrozen"])
         post_only = int(data_json[coin]["postOnly"])
         if not frozen and not post_only:
+            # Reformat pairs with to the form : base_quote
             tradable_coins.append(coin)
     return tradable_coins
 
@@ -372,24 +377,106 @@ def calculate_surface_rates(tpair, prices_dict):
 
     return surface_dict
 
-def get_depth_from_orderbook():
+def reformat_orderbook(orderbook, c_direction):
+    orderbook_reformatted_list = []
+    if c_direction == "baseToQuote":
+        for i in range(0, len(orderbook["asks"]), 2):
+            ask_price = float(orderbook["asks"][i])
+            quantity = float(orderbook["asks"][i+1])
+
+            adj_price = 1/ask_price if ask_price != 0 else 0
+            adj_quantity = ask_price * quantity
+            orderbook_reformatted_list.append([adj_price, adj_quantity])
+
+    elif c_direction == "quoteToBase":
+        for i in range(0, len(orderbook["bids"]), 2):
+            bid_price = float(orderbook["bids"][i])
+            quantity = float(orderbook["bids"][i+1])
+
+            adj_price = bid_price
+            adj_quantity = bid_price * quantity
+            orderbook_reformatted_list.append([adj_price, adj_quantity])
+    return orderbook_reformatted_list
+
+def calculate_acquired_coin(amount_in, orderbook):
+    trading_balance = amount_in
+    quantity_bought = 0
+    acquired_amount = 0
+    iteration = 0
+
+    for line in orderbook:
+        # Extract the level price and quantity
+        level_price, level_quantity_available = line
+
+        # Trading balance <= level total amount
+        if trading_balance <= level_quantity_available:
+            acquired_amount += trading_balance * level_price
+            trading_balance = 0
+
+        elif trading_balance > level_quantity_available:
+            acquired_amount += level_quantity_available * level_price
+            trading_balance -= level_quantity_available
+
+        iteration += 1
+
+        # Exit trade
+        # Spend all trading balance
+        if trading_balance == 0:
+            return acquired_amount
+
+        # Not enough lines in orderbook
+        if iteration == len(orderbook):
+            return 0
+
+def get_depth_from_orderbook(trade_posibility):
     # Extract inital variables
-    starting_amount = 100
-    swap_1 = "USDT"
+    starting_amount = 1000
+
+    swap_1 = "BTC"
 
     # Define pairs
-    contract_1 = "BTC_USDT"
-    contract_2 = "BTC_INJ"
-    contract_3 = "USDT_INJ"
+    contract_1 = reverse_pair(trade_posibility["contract1"])
+    contract_2 = reverse_pair(trade_posibility["contract2"])
+    contract_3 = reverse_pair(trade_posibility["contract3"])
 
     # Define direction for trades
-    contract_1_direction = "baseToQuote"
-    contract_1_direction = "baseToQuote"
-    contract_1_direction = "quoteToBase"
+    contract_1_direction = trade_posibility["direction_trade_1"]
+    contract_2_direction = trade_posibility["direction_trade_2"]
+    contract_3_direction = trade_posibility["direction_trade_3"]
 
     # Get orderbook for first trade assessment
     url1 = f"https://api.poloniex.com/markets/{contract_1}/orderBook?limit=20"
+    url2 = f"https://api.poloniex.com/markets/{contract_2}/orderBook?limit=20"
+    url3 = f"https://api.poloniex.com/markets/{contract_3}/orderBook?limit=20"
+
     depth_1_prices = get_coin_tickers(url1)
-    pprint(depth_1_prices)
+    depth_1_prices_reformatted = reformat_orderbook(depth_1_prices, contract_1_direction)
+    acquired_coin_trade_1 = calculate_acquired_coin(starting_amount, depth_1_prices_reformatted)
+
+    depth_2_prices = get_coin_tickers(url2)
+    depth_2_prices_reformatted = reformat_orderbook(depth_2_prices, contract_2_direction)
+    acquired_coin_trade_2 = calculate_acquired_coin(acquired_coin_trade_1, depth_2_prices_reformatted)
+
+    depth_3_prices = get_coin_tickers(url3)
+    depth_3_prices_reformatted = reformat_orderbook(depth_3_prices, contract_3_direction)
+    acquired_coin_trade_3 = calculate_acquired_coin(acquired_coin_trade_2, depth_3_prices_reformatted)
+
+    profit_loss = acquired_coin_trade_3 - starting_amount
+    profit_loss_perc = (profit_loss/starting_amount) if starting_amount != 0 else 0
+
+    return {
+        "starting_amount": starting_amount,
+        "profit_loss": profit_loss,
+        "profit_loss_perc": profit_loss_perc,
+        "contract_1": contract_1,
+        "contract_2": contract_2,
+        "contract_3": contract_3,
+        "contract_1_direction": contract_1_direction,
+        "contract_2_direction": contract_2_direction,
+        "contract_3_direction": contract_3_direction
+    }
+
+
+
 
 

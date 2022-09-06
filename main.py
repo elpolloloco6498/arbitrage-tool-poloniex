@@ -1,4 +1,5 @@
 import json
+import time
 from pprint import pprint
 import arbitrage
 
@@ -34,13 +35,20 @@ def step_2():
 
     for tpair in structured_pairs:
         prices_dict = arbitrage.get_price_for_tpair(tpair, prices_json)
-        surface_arb = arbitrage.calculate_surface_rates(tpair, prices_dict)
-        if len(surface_arb) > 0:
-            print(surface_arb["contract1"], surface_arb["contract2"], surface_arb["contract2"], surface_arb["profit_loss_perc"])
+        trade_posibility = arbitrage.calculate_surface_rates(tpair, prices_dict)
+        if len(trade_posibility) > 0:
+            print(trade_posibility["contract1"], trade_posibility["contract2"], trade_posibility["contract2"], trade_posibility["profit_loss_perc"])
+            real_rate_arb = arbitrage.get_depth_from_orderbook(trade_posibility)
+            if real_rate_arb["profit_loss"] > 0:
+                pprint(real_rate_arb)
 
 if __name__ == "__main__":
     #tradable_coins = step_0()
     #step_1(tradable_coins)
-    #step_2()
-    arbitrage.get_depth_from_orderbook()
+    while True:
+        step_2()
+        time.sleep(10)
+
+    #depth = arbitrage.get_depth_from_orderbook()
+
     print("[*] Program executed successfully")
