@@ -372,5 +372,24 @@ def calculate_surface_rates(tpair, prices_dict):
 
     return surface_dict
 
+def get_depth_from_orderbook():
+    # Extract inital variables
+    starting_amount = 100
+    swap_1 = "USDT"
+
+    # Define pairs
+    contract_1 = "BTC_USDT"
+    contract_2 = "BTC_INJ"
+    contract_3 = "USDT_INJ"
+
+    # Define direction for trades
+    contract_1_direction = "baseToQuote"
+    contract_1_direction = "baseToQuote"
+    contract_1_direction = "quoteToBase"
+
+    # Get orderbook for first trade assessment
+    url1 = f"https://api.poloniex.com/markets/{contract_1}/orderBook?limit=20"
+    depth_1_prices = get_coin_tickers(url1)
+    pprint(depth_1_prices)
 
 

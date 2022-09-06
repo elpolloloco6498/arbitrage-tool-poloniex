@@ -41,5 +41,6 @@ def step_2():
 if __name__ == "__main__":
     #tradable_coins = step_0()
     #step_1(tradable_coins)
-    step_2()
+    #step_2()
+    arbitrage.get_depth_from_orderbook()
     print("[*] Program executed successfully")
